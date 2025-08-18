@@ -23,6 +23,7 @@ switch(command) {
     case 'list': list(); break
     case 'summary': summary(); break
     case 'delete': deleteTrack(); break
+    case 'budget': budgetLimit(); break
     default:
         console.error(`command should be add/list/summary/delete`); break
 }
@@ -111,6 +112,16 @@ function list() {
     else
         console.table(tracks)
 }
+function monthRaneCheck(num) {
+    let monthRange = Array.from({length: 12}, (x, i) => i + 1)
+    if(!monthRange.includes(num)){ 
+        return true
+    }
+    else {
+        console.error(`Month should be in range of 1-12`)
+        return false
+    }
+}
 function summary() {
     let summary = 0
     let monthRange = Array.from({length: 12}, (x, i) => i + 1)
@@ -142,5 +153,38 @@ function summary() {
     else {
         tracks.forEach(item => summary += item.amount)
         console.log(`Total expenses: `, summary)
+    }
+}
+function budgetLimit() {
+    if(argv.amount !== undefined && typeof(argv.amount) !== 'boolean') {
+        let isAmountValValid = isValValid(argv, 'amount')
+        if(isAmountValValid) {
+            if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
+                let isMonthValValid = isValValid(argv, 'month')
+                let isMonthValInRange = monthRaneCheck(argv.month)
+                
+            }
+            else
+                console.error(`You didn't initialize the month`)
+        }
+    }
+    else
+        console.error(`You didn't initialize the amount`)
+
+    function isValValid(obj, prop) {
+        try {
+            if(isNaN(obj[prop]))
+                throw `notNum`
+            if(obj[prop] < 0)
+                throw `negative`
+            return true
+        }
+        catch(error) {
+            if(error === `notNum`)
+                console.error(`${prop} should be number`)
+            if(error === `negative`)
+                console.error(`${prop} should be positive number`)
+            return false
+        }
     }
 }
