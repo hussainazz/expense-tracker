@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { type } from 'node:os'
 import yargs from 'yargs'
 
 let argv = yargs(process.argv.slice(2)).parse()
@@ -36,34 +37,38 @@ function addTrack() {
         if((!argv.description && !argv.amount) || checkOrder || (argv.amount  && !argv.description))
             throw `invalidCommand`
         if(typeof(argv.description) === 'boolean' || !argv.description)
-            throw `noDescription`
+            throw `descriptionEmpty`
         if(typeof(argv.amount) === 'boolean' || !argv.amount)
-            throw `noAmount`
+            throw `amountEmpty`
         if(argv.amount < 0)
-            throw `negativeNum`
+            throw `amountNegative`
         if(typeof(argv.amount) !== 'number')
             throw `amountNotNum`
-        if(argv.amount)
+        if(typeof(argv.category) === 'boolean')
+            throw `categoryEmpty`
         tracks.push({
             id: newId,
             date: formattedDate(),
             description: argv.description,
             amount: argv.amount,
+            category: argv?.category || 'none'
         })
         writeFile()
         console.log(`Expense added successfully. ID : ${newId}`)
     } catch(error) {
         switch(error){
             case 'invalidCommand':
-                console.error(`The command instructure for adding tracks should be: add --description '<text>' --amount <number>`); break
-            case 'noDescription':
+                console.error(`The command instructure for adding tracks should be: add --description '<text>' --amount <number> [--category <text>]`); break
+            case 'descriptionEmpty':
                 console.error(`Description should not be empty`); break
-            case 'noAmount':
+            case 'amountEmpty':
                 console.error('Amount should not be empty'); break
-            case 'negativeNum':
+            case 'amountNegative':
                 console.error(`Amount should be positive number`); break
             case 'amountNotNum':
                 console.error(`Amount should be a number`); break
+            case 'categoryEmpty':
+                console.error(`Category is empty`)
             }
     }
 }
@@ -98,7 +103,13 @@ function deleteTrack() {
     }
 }
 function list() {
-    console.table(tracks)
+    let filterTrackByCategory
+    if(argv.category !== undefined && typeof(argv.category) !== 'boolean') {
+        filterTrackByCategory = tracks.filter(item => item.category === argv.category)
+        console.table(filterTrackByCategory)
+    }
+    else
+        console.table(tracks)
 }
 function summary() {
     let summary = 0
