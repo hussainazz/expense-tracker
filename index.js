@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { type } from 'node:os'
 
 import yargs from 'yargs'
 
@@ -149,7 +150,7 @@ function summary() {
 
             let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) === argv.month)
             filterTracksByMonth.forEach(item => summary += item.amount)
-            console.log(`Total expenses for ${numberToMonth(argv.month.toString())}:`, summary)
+            console.log(`Total expenses for ${numberToMonth(`${argv.month}`)}:`, summary)
         }
         catch(error) {
             if(error === `empty`)
@@ -172,11 +173,18 @@ function budgetLimit() {
             if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
                 let isMonthValValid = isValValid(argv, 'month')
                 if(isMonthValValid) {
-                    budget.push(
-                        {
-                            [argv.month] : argv.amount
-                        }
-                    )
+                    let budgetKeys = budget.map(item => Object.keys(item)[0])
+                    let budgetAlreadyExist = budgetKeys.includes(argv.month.toString())
+                    if(budgetAlreadyExist) {
+                        budget
+                            .find(item => Object.keys(item) == argv.month)
+                            [argv.month.toString()] = argv.amount
+                        console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${argv.amount}`)
+                    }
+                    else {
+                        budget.push({ [argv.month] : argv.amount })
+                        console.log(`${numberToMonth(`${argv.month}`)} budget set to $${argv.amount}`)
+                    }
                     writeFile()
                 }
             }
@@ -186,6 +194,7 @@ function budgetLimit() {
     }
     else
         console.error(`You didn't initialize the amount`)
+
 
     function isValValid(obj, prop) {
         try {
