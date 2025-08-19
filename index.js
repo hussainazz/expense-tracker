@@ -114,31 +114,29 @@ function list() {
 }
 function monthRaneCheck(num) {
     let monthRange = Array.from({length: 12}, (x, i) => i + 1)
-    if(!monthRange.includes(num)){ 
-        return true
-    }
-    else {
+    try {
+        if(!monthRange.includes(num)){ 
+            throw err
+        }
+    } catch {
         console.error(`Month should be in range of 1-12`)
-        return false
     }
+}
+function numberToMonth(num) {
+    return Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(num))
 }
 function summary() {
     let summary = 0
-    let monthRange = Array.from({length: 12}, (x, i) => i + 1)
     if(argv.month) {
         try {
             if(typeof(argv.month) === 'boolean')
                 throw `empty`
             if(isNaN(argv.month))
                 throw `notNum`
-            if(!monthRange.includes(argv.month))
-                throw `rangeErr`
+            monthRaneCheck(argv.month)
 
             let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) === argv.month)
             filterTracksByMonth.forEach(item => summary += item.amount)
-            function numberToMonth(num) {
-                return Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(num))
-            }
             console.log(`Total expenses for ${numberToMonth(argv.month.toString())}:`, summary)
         }
         catch(error) {
@@ -161,7 +159,7 @@ function budgetLimit() {
         if(isAmountValValid) {
             if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
                 let isMonthValValid = isValValid(argv, 'month')
-                let isMonthValInRange = monthRaneCheck(argv.month)
+                monthRaneCheck(argv.month)
                 
             }
             else
