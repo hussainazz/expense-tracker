@@ -1,22 +1,34 @@
 import fs from 'node:fs'
-import { type } from 'node:os'
+
 import yargs from 'yargs'
 
 let argv = yargs(process.argv.slice(2)).parse()
 let command = argv._[0]?.toLowerCase()
 let tracks = []
+let budget = []
 
 try {
-    tracks = JSON.parse(fs.readFileSync(`expense-tracks.json`))
+    let dataBase = JSON.parse(fs.readFileSync(`expense-tracks.json`))
+    tracks = dataBase.expenseTracks
+    budget = dataBase.budget
 } catch {
     writeFile()
 }
 
 function writeFile() {
-    fs.writeFileSync(`expense-tracks.json`, JSON.stringify(tracks))
+    (function sortBudget() {
+        let finalBudget = []
+        let budgetKeys = budget.map(item => Number(Object.keys(item)))
+        budgetKeys = budgetKeys.sort((a,b) => {return a - b})
+        budgetKeys.forEach(month => finalBudget.push( {
+            [month]: Object.values(budget.find(item => Object.keys(item) == month))[0]
+        } ) )
+        budget = finalBudget
+    })()
+    fs.writeFileSync(`expense-tracks.json`,JSON.stringify({expenseTracks: tracks, budget: budget}))
 }
 
-// command = add/list/summary/delete
+// command = add/list/summary/delete/budget
 
 switch(command) {
     case 'add': addTrack(); break
@@ -159,8 +171,14 @@ function budgetLimit() {
         if(isAmountValValid) {
             if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
                 let isMonthValValid = isValValid(argv, 'month')
-                monthRaneCheck(argv.month)
-                
+                if(isMonthValValid) {
+                    budget.push(
+                        {
+                            [argv.month] : argv.amount
+                        }
+                    )
+                    writeFile()
+                }
             }
             else
                 console.error(`You didn't initialize the month`)
