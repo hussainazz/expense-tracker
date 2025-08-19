@@ -1,6 +1,4 @@
 import fs from 'node:fs'
-import { type } from 'node:os'
-
 import yargs from 'yargs'
 
 let argv = yargs(process.argv.slice(2)).parse()
@@ -67,8 +65,10 @@ function addTrack() {
             amount: argv.amount,
             category: argv?.category || 'none'
         })
-        writeFile()
         console.log(`Expense added successfully. ID : ${newId}`)
+        remainedBudget(newId, -argv.amount)
+
+        writeFile()
     } catch(error) {
         switch(error){
             case 'invalidCommand':
@@ -103,9 +103,11 @@ function deleteTrack() {
             throw `notNumber`
         if(!tracks.some(item => item.id == trackId))
             throw `foundNoTrack`
+        let deletedExpenseAmount = tracks.find(item => item.id === trackId).amount
+        console.log(`Expense deleted successfully. ID : ${trackId}`)
+        remainedBudget(trackId, +deletedExpenseAmount)
         tracks = tracks.filter(item => item.id !== trackId)
         writeFile()
-        console.log(`Expense deleted successfully. ID : ${trackId}`)
     }
     catch(error) {
         if(error === `emptyId`)
@@ -204,12 +206,27 @@ function budgetLimit() {
                 throw `negative`
             return true
         }
-        catch(error) {
+        catch(error) { 
             if(error === `notNum`)
                 console.error(`${prop} should be number`)
             if(error === `negative`)
                 console.error(`${prop} should be positive number`)
             return false
         }
+    }
+}
+function remainedBudget(expenseId, /* month, */ amount) {
+    //split the epxense's date's month
+    let monthSplit = tracks.find(item => item.id == expenseId)?.date
+    monthSplit = parseInt(monthSplit?.slice(5,7))
+
+    // if remained budget is ngative return warninig error
+    let targetMonthBudget = budget.find(item => Object.keys(item) == monthSplit)
+    if(monthSplit) {
+        budget = budget.filter(item => Object.keys(item) != monthSplit)
+        targetMonthBudget[monthSplit] += amount
+        budget.push(targetMonthBudget)
+        console.log(`${numberToMonth(`${monthSplit}`)} budget remaining: `,targetMonthBudget[monthSplit])
+        writeFile()
     }
 }
