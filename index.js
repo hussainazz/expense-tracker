@@ -32,9 +32,9 @@ function writeFile() {
 switch(command) {
     case 'add': addTrack(); break
     case 'list': list(); break
-    case 'summary': summary(); break
+    case 'summary': summary(argv.month); break
     case 'delete': deleteTrack(); break
-    case 'budget': budgetLimit(); break
+    case 'budget': budgetHandler(); break
     default:
         console.error(`command should be add/list/summary/delete`); break
 }
@@ -66,13 +66,14 @@ function addTrack() {
             category: argv?.category || 'none'
         })
         console.log(`Expense added successfully. ID : ${newId}`)
-        remainedBudget(newId, -argv.amount)
-
         writeFile()
-    } catch(error) {
+        budgetAfter_add_delete(-argv.amount, newId)
+        
+    } 
+    catch(error) {
         switch(error){
             case 'invalidCommand':
-                console.error(`The command instructure for adding tracks should be: add --description '<text>' --amount <number> [--category <text>]`); break
+                console.error(`The command structure for adding tracks should be: add --description '<text>' --amount <number> [--category <text>]`); break
             case 'descriptionEmpty':
                 console.error(`Description should not be empty`); break
             case 'amountEmpty':
@@ -105,7 +106,7 @@ function deleteTrack() {
             throw `foundNoTrack`
         let deletedExpenseAmount = tracks.find(item => item.id === trackId).amount
         console.log(`Expense deleted successfully. ID : ${trackId}`)
-        remainedBudget(trackId, +deletedExpenseAmount)
+        budgetAfter_add_delete(+deletedExpenseAmount, trackId)
         tracks = tracks.filter(item => item.id !== trackId)
         writeFile()
     }
@@ -133,26 +134,31 @@ function monthRaneCheck(num) {
         if(!monthRange.includes(num)){ 
             throw err
         }
+        return true
     } catch {
         console.error(`Month should be in range of 1-12`)
+        return false
     }
 }
 function numberToMonth(num) {
     return Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(num))
 }
-function summary() {
+function summary(month) {
     let summary = 0
-    if(argv.month) {
+    if(month) {
+        let currentMonth = splitMonthByDate(formattedDate())
         try {
-            if(typeof(argv.month) === 'boolean')
+            if(typeof(month) === 'boolean')
                 throw `empty`
-            if(isNaN(argv.month))
+            if(isNaN(month))
                 throw `notNum`
-            monthRaneCheck(argv.month)
+            monthRaneCheck(month)
 
-            let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) === argv.month)
+            let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) === month)
             filterTracksByMonth.forEach(item => summary += item.amount)
-            console.log(`Total expenses for ${numberToMonth(`${argv.month}`)}:`, summary)
+            if(month != currentMonth)
+                console.log(`Total expenses for ${numberToMonth(`${month}`)}:`, summary)
+            return summary
         }
         catch(error) {
             if(error === `empty`)
@@ -166,37 +172,77 @@ function summary() {
     else {
         tracks.forEach(item => summary += item.amount)
         console.log(`Total expenses: `, summary)
+        return summary
     }
 }
-function budgetLimit() {
-    if(argv.amount !== undefined && typeof(argv.amount) !== 'boolean') {
-        let isAmountValValid = isValValid(argv, 'amount')
-        if(isAmountValValid) {
-            if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
-                let isMonthValValid = isValValid(argv, 'month')
-                if(isMonthValValid) {
-                    let budgetKeys = budget.map(item => Object.keys(item)[0])
-                    let budgetAlreadyExist = budgetKeys.includes(argv.month.toString())
-                    if(budgetAlreadyExist) {
-                        budget
-                            .find(item => Object.keys(item) == argv.month)
-                            [argv.month.toString()] = argv.amount
-                        console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${argv.amount}`)
+function budgetHandler() {
+    if(argv.remove !== undefined && typeof(argv.remove) !== 'boolean'){
+        (function deleteBudget() {
+            if(isValValid(argv, 'remove')) {
+                if(monthRaneCheck(argv.remove)) {
+                    let haveMonthBudget = budget.some(item => Object.keys(item) == argv.remove)
+                    if(haveMonthBudget) {
+                        removeBudget(argv.remove)
+                        console.log(`Budget removed for ${numberToMonth(`${argv.remove}`)}`)
+                        return
                     }
                     else {
-                        budget.push({ [argv.month] : argv.amount })
-                        console.log(`${numberToMonth(`${argv.month}`)} budget set to $${argv.amount}`)
+                        console.error(`No budget had been set for ${numberToMonth(`${argv.remove}`)}`)
+                        return
                     }
-                    writeFile()
                 }
+                else
+                    return
             }
             else
-                console.error(`You didn't initialize the month`)
-        }
+                return
+        })()
+        return
+    }
+    else if(argv.remove === undefined && typeof(argv.remove) === 'boolean') {
+        console.error(`You didn't initialize the month to have its budget removed.`)
+        return
+    }
+
+    if(argv.amount !== undefined && typeof(argv.amount) !== 'boolean') {
+        (function initializeBudget() {
+            let isAmountValValid = isValValid(argv, 'amount')
+            if(isAmountValValid) {
+                if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
+                    let isMonthValValid = isValValid(argv, 'month')
+                    if(isMonthValValid) {
+                        
+
+                        let budgetKeys = budget.map(item => Object.keys(item)[0])
+                        let budgetAlreadyExist = budgetKeys.includes(argv.month.toString())
+                        if(budgetAlreadyExist) {
+                            budget
+                                .find(item => Object.keys(item) == argv.month)
+                                [argv.month.toString()] = argv.amount
+                            substractPreviousExpensesFromNewSetBudget(argv.month)
+                            console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
+                        }
+                        else {
+                            budget.push({ [argv.month] : argv.amount })
+                            substractPreviousExpensesFromNewSetBudget(argv.month)
+
+                            console.log(`${numberToMonth(`${argv.month}`)} budget set to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
+                        }
+                        writeFile()
+                    }
+                }
+                else
+                    console.error(`You didn't initialize the month`)
+            }
+        })()
     }
     else
         console.error(`You didn't initialize the amount`)
 
+    function removeBudget(month) {
+        budget = budget.filter(item => Object.keys(item) != month)
+        writeFile()
+    }
 
     function isValValid(obj, prop) {
         try {
@@ -215,26 +261,53 @@ function budgetLimit() {
         }
     }
 }
-function remainedBudget(expenseId, /* month, */ amount) {
-    let monthSplit = tracks.find(item => item.id == expenseId)?.date
-    monthSplit = parseInt(monthSplit?.slice(5,7))
 
-    // if remained budget is ngative return warninig error
-    let targetMonthBudget = budget.find(item => Object.keys(item) == monthSplit)
-    if(monthSplit) {
-        budget = budget.filter(item => Object.keys(item) != monthSplit)
-        
+function budgetAfter_add_delete(amount, /* month, */ expenseId) {
+    let month = splitMonthById(expenseId)
+
+    let monthBudget = budget.find(item => Object.keys(item) == month) // || {[month]:finalSum}
+    if(month) {
+        budget = budget.filter(item => Object.keys(item) != month)
+
         try {
-            let remainedMonthBudget = targetMonthBudget[monthSplit] + amount
+            let remainedMonthBudget = monthBudget[month] + amount
             if(remainedMonthBudget < 0)
                 throw `budgetNegative`
         }
         catch {
-            console.warn(`Warning! Expense is more than budget. The remained budget for this month: ${targetMonthBudget[monthSplit]}`)
+            console.warn(`Warning! Expense is more than budget. The remained budget for this month: ${monthBudget[month]}`)
         }
-        targetMonthBudget[monthSplit] += amount
-        budget.push(targetMonthBudget)
-        console.log(`${numberToMonth(`${monthSplit}`)} budget remaining: `,targetMonthBudget[monthSplit])
+        monthBudget[month] += amount
+        budget.push(monthBudget)
+        console.log(`${numberToMonth(`${month}`)} budget remaining: `,monthBudget[month]) // worked properly
         writeFile()
+    }
+}
+function splitMonthById(expenseId) {
+    let splitMonth = tracks.find(item => item.id == expenseId)?.date
+    splitMonth = parseInt(splitMonth?.slice(5,7))
+    return splitMonth
+}
+function splitMonthByDate(date) {
+    let splitedMonth = parseInt(date?.slice(5,7))
+    return splitedMonth
+}
+function substractPreviousExpensesFromNewSetBudget(month) {
+    let currentMonth = splitMonthByDate(formattedDate())
+    let currentMonthSum = summary(currentMonth)
+
+    if(month == currentMonth) {
+        // why this worked?
+        budget.find(item => Object.keys(item) == currentMonth)[month] -= currentMonthSum
+        let remainedBudget_substractingMonthBudget = budget.find(item => Object.keys(item) == currentMonth)[month]
+        writeFile()
+        try {
+            if(remainedBudget_substractingMonthBudget < 0)
+                throw `budgetNegative`
+        }
+        catch {
+            console.warn(`Warning! Expense is more than budget. The remained budget for this month: $${remainedBudget_substractingMonthBudget}`)
+        }
+
     }
 }
