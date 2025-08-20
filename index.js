@@ -216,7 +216,6 @@ function budgetLimit() {
     }
 }
 function remainedBudget(expenseId, /* month, */ amount) {
-    //split the epxense's date's month
     let monthSplit = tracks.find(item => item.id == expenseId)?.date
     monthSplit = parseInt(monthSplit?.slice(5,7))
 
@@ -224,6 +223,15 @@ function remainedBudget(expenseId, /* month, */ amount) {
     let targetMonthBudget = budget.find(item => Object.keys(item) == monthSplit)
     if(monthSplit) {
         budget = budget.filter(item => Object.keys(item) != monthSplit)
+        
+        try {
+            let remainedMonthBudget = targetMonthBudget[monthSplit] + amount
+            if(remainedMonthBudget < 0)
+                throw `budgetNegative`
+        }
+        catch {
+            console.warn(`Warning! Expense is more than budget. The remained budget for this month: ${targetMonthBudget[monthSplit]}`)
+        }
         targetMonthBudget[monthSplit] += amount
         budget.push(targetMonthBudget)
         console.log(`${numberToMonth(`${monthSplit}`)} budget remaining: `,targetMonthBudget[monthSplit])
