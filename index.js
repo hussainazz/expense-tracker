@@ -125,6 +125,9 @@ function list() {
         filterTrackByCategory = tracks.filter(item => item.category === argv.category)
         console.table(filterTrackByCategory)
     }
+    else if(argv.month) {
+        //TODO
+    }
     else
         console.table(tracks)
 }
@@ -183,11 +186,11 @@ function budgetHandler() {
                     let haveMonthBudget = budget.some(item => Object.keys(item) == argv.remove)
                     if(haveMonthBudget) {
                         removeBudget(argv.remove)
-                        console.log(`Budget removed for ${numberToMonth(`${argv.remove}`)}`)
+                        console.log(`${numberToMonth(`${argv.remove};s budget removed successfully.`)}`)
                         return
                     }
                     else {
-                        console.error(`No budget had been set for ${numberToMonth(`${argv.remove}`)}`)
+                        console.error(`No budget had been set for ${numberToMonth(`${argv.remove}.`)}`)
                         return
                     }
                 }
@@ -210,16 +213,19 @@ function budgetHandler() {
             if(isAmountValValid) {
                 if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
                     let isMonthValValid = isValValid(argv, 'month')
-                    if(isMonthValValid) {
-                        
-
+                    let isMonthInRange =  monthRaneCheck(argv.month)
+                    if(isMonthValValid && isMonthInRange) {
                         let budgetKeys = budget.map(item => Object.keys(item)[0])
                         let budgetAlreadyExist = budgetKeys.includes(argv.month.toString())
+                        
+                        
                         if(budgetAlreadyExist) {
                             budget
                                 .find(item => Object.keys(item) == argv.month)
                                 [argv.month.toString()] = argv.amount
-                            substractPreviousExpensesFromNewSetBudget(argv.month)
+                            // TODO takes the amount in both side of condition from below function or make it work outside of condition.
+                            substractPreviousExpensesFromNewSetBudget(argv.month) // -> move it out
+            
                             console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
                         }
                         else {
@@ -232,7 +238,7 @@ function budgetHandler() {
                     }
                 }
                 else
-                    console.error(`You didn't initialize the month`)
+                    console.error(`You didn't initialize the month.`)
             }
         })()
     }
@@ -275,7 +281,7 @@ function budgetAfter_add_delete(amount, /* month, */ expenseId) {
                 throw `budgetNegative`
         }
         catch {
-            console.warn(`Warning! Expense is more than budget. The remained budget for this month: ${monthBudget[month]}`)
+            console.warn(`Warning! Expenses has passed the budget. The remained budget for this month: ${monthBudget[month]}`)
         }
         monthBudget[month] += amount
         budget.push(monthBudget)
@@ -297,7 +303,7 @@ function substractPreviousExpensesFromNewSetBudget(month) {
     let currentMonthSum = summary(currentMonth)
 
     if(month == currentMonth) {
-        // why this worked?
+        
         budget.find(item => Object.keys(item) == currentMonth)[month] -= currentMonthSum
         let remainedBudget_substractingMonthBudget = budget.find(item => Object.keys(item) == currentMonth)[month]
         writeFile()
