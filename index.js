@@ -1,14 +1,12 @@
 import fs from 'node:fs'
 import yargs from 'yargs'
 
-let argv = yargs(process.argv.slice(2)).parse()
+let argv = 
+    yargs(process.argv.slice(2))
+    .parse()
 let command = argv._[0]?.toLowerCase()
 let tracks = []
 let budget = []
-
-function isArgvPropValid(argvProp) {
-    return argvProp !== undefined && typeof(argvProp) !== 'boolean'
-}
 
 try {
     let dataBase = JSON.parse(fs.readFileSync(`expense-tracks.json`))
@@ -17,11 +15,64 @@ try {
 } catch {
     writeFile()
 }
+
+let errorHandling = {
+    isInitialized: (obj, prop) => {
+        try{
+            if(!obj[prop])
+                throw `notInitialized`
+        }
+        catch{
+            console.error(`You didn't initialized the ${prop}.`)
+        }
+    },
+    isNotEmpty: (obj, prop) => {
+        try{
+            if(obj[prop] === true)
+                throw `notDefined`
+        }
+        catch{
+            console.error(`${prop} can't be empty.`)
+        }
+    },
+    isPositiveNumber: (obj, prop) => {
+        try {
+            if(isNaN(obj[prop]))
+                throw `notNum`
+            if(obj[prop] < 0)
+                throw `negative`
+            // return true
+        }
+        catch(error) { 
+            if(error === `notNum`)
+                console.error(`${prop} should be a number.`)
+            if(error === `negative`)
+                console.error(`${prop} should be a positive number.`)
+            // return false
+        }
+    },
+    isValidMonthRange: (num) => {
+        let monthRange = Array.from({length: 12}, (x, i) => i + 1)
+        try {
+            if(!monthRange.includes(num)){ 
+                throw `rangeErr`
+            }
+            return true
+        } catch {
+            console.error(`Month should be in range of 1-12`)
+            return false
+        }
+    } 
+}
+
 function writeFile() {
-    (function sortBudget() {
+    // create/store-in final data in json file
+    (function sortBudgetByMonth() {
         let finalBudget = []
-        let budgetKeys = budget.map(item => Number(Object.keys(item)))
-        budgetKeys = budgetKeys.sort((a,b) => {return a - b})
+        let budgetKeys = 
+            budget
+                .map(item => Number(Object.keys(item)))
+                .sort((a,b) => {return a - b})
         budgetKeys.forEach(month => finalBudget.push( {
             [month]: Object.values(budget.find(item => Object.keys(item) == month))[0]
         } ) )
@@ -37,21 +88,22 @@ switch(command) {
     case 'delete': deleteTrack(); break
     case 'budget': budgetHandler(); break
     default:
-        console.error(`command should be add/list/summary/delete`); break
+        // console.error(`Command should be add/list/summary/delete/budget`); break
 }
+
 function addTrack() {
     let newId = tracks.length + 1
     if(tracks.some(item => item.id == newId))
         newId += 1
     try {
-        let argvKeys = Object.keys(argv)
-        let checkOrder = argvKeys.indexOf('amount') < argvKeys.indexOf('description')
-        if((!argv.description && !argv.amount) || checkOrder || (argv.amount  && !argv.description))
-            throw `invalidCommand`
-        if(typeof(argv.description) === 'boolean' || !argv.description)
-            throw `descriptionEmpty`
-        if(typeof(argv.amount) === 'boolean' || !argv.amount)
-            throw `amountEmpty`
+        // let argvKeys = Object.keys(argv)
+        // let checkOrder = argvKeys.indexOf('amount') < argvKeys.indexOf('description')
+        // if((!argv.description && !argv.amount) || checkOrder || (argv.amount  && !argv.description))
+        //     throw `invalidCommand`
+        if(!argv.description) throw `descriptionUndefined`
+        if(argv.description === true) throw `descriptionEmpty`
+        if(!argv.amount) throw `amountUndefined`
+        if(argv.amount === true) throw `amountEmpty`
         isPositiveNumber(argv, 'amount')
         if(typeof(argv.category) === 'boolean')
             throw `categoryEmpty`
@@ -67,12 +119,12 @@ function addTrack() {
     }
     catch(error) {
         switch(error){
-            case 'invalidCommand':
-                console.error(`The command structure for adding tracks should be: add --description '<text>' --amount <number> [--category <text>]`); break
-            case 'descriptionEmpty':
-                console.error(`Description should not be empty`); break
-            case 'amountEmpty':
-                console.error('Amount should not be empty'); break
+            // case 'invalidCommand':
+            //     console.error(`The command structure for adding tracks should be: add --description '<text>' --amount <number> [--category <text>]`); break
+            case `descriptionUndefined`: console.error(`You didn't initialize the description.`); break
+            case 'descriptionEmpty': console.error(`Description should not be empty`); break
+            case `amountUndefined`: console.error(`You didn't initalize the amount`); break
+            case 'amountEmpty': console.error(`Amount can't not be empty`); break
             case 'amountNegative':
                 console.error(`Amount should be positive number`); break
             case 'amountNotNum':
@@ -250,7 +302,6 @@ function budgetHandler() {
         writeFile()
     }
 }
-
 function isPositiveNumber(obj, prop) {
     try {
             if(isNaN(obj[prop]))
@@ -267,7 +318,6 @@ function isPositiveNumber(obj, prop) {
             return false
         }
 }
-
 function budgetAfter_add_delete(expenseAmount, expenseId) {
     let month = find_splitMonth(expenseId)
 
@@ -292,7 +342,6 @@ function find_splitMonth(expenseId) {
     splitMonth = parseInt(splitMonth?.slice(5,7))
     return splitMonth
 }
-
 function splitMonth(date) {
     let splitedMonth = parseInt(date?.slice(5,7))
     return splitedMonth
