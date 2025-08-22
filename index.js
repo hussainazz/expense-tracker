@@ -6,6 +6,10 @@ let command = argv._[0]?.toLowerCase()
 let tracks = []
 let budget = []
 
+function isArgvPropValid(argvProp) {
+    return argvProp !== undefined && typeof(argvProp) !== 'boolean'
+}
+
 try {
     let dataBase = JSON.parse(fs.readFileSync(`expense-tracks.json`))
     tracks = dataBase.expenseTracks
@@ -13,7 +17,6 @@ try {
 } catch {
     writeFile()
 }
-
 function writeFile() {
     (function sortBudget() {
         let finalBudget = []
@@ -26,8 +29,6 @@ function writeFile() {
     })()
     fs.writeFileSync(`expense-tracks.json`,JSON.stringify({expenseTracks: tracks, budget: budget}))
 }
-
-// command = add/list/summary/delete/budget
 
 switch(command) {
     case 'add': addTrack(); break
@@ -45,31 +46,25 @@ function addTrack() {
     try {
         let argvKeys = Object.keys(argv)
         let checkOrder = argvKeys.indexOf('amount') < argvKeys.indexOf('description')
-        // The parser coerces the argument if the user doesn't set value, boolean type check is because of this matter  
         if((!argv.description && !argv.amount) || checkOrder || (argv.amount  && !argv.description))
             throw `invalidCommand`
         if(typeof(argv.description) === 'boolean' || !argv.description)
             throw `descriptionEmpty`
         if(typeof(argv.amount) === 'boolean' || !argv.amount)
             throw `amountEmpty`
-        if(argv.amount < 0)
-            throw `amountNegative`
-        if(typeof(argv.amount) !== 'number')
-            throw `amountNotNum`
+        isPositiveNumber(argv, 'amount')
         if(typeof(argv.category) === 'boolean')
             throw `categoryEmpty`
         tracks.push({
             id: newId,
-            date: formattedDate(),
+            date: currentDate(),
             description: argv.description,
             amount: argv.amount,
             category: argv?.category || 'none'
         })
-        console.log(`Expense added successfully. ID : ${newId}`)
-        writeFile()
         budgetAfter_add_delete(-argv.amount, newId)
-        
-    } 
+        console.log(`Expense added successfully. ID : ${newId}`)
+    }
     catch(error) {
         switch(error){
             case 'invalidCommand':
@@ -87,8 +82,8 @@ function addTrack() {
             }
     }
 }
-function formattedDate() {
-    let today = new Date()
+function currentDate() {
+    const today = new Date()
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
     const day = today.getDate();
@@ -97,6 +92,7 @@ function formattedDate() {
 }
 function deleteTrack() {
     let trackId = argv.id
+    
     try {
         if(!trackId || typeof(trackId) === 'boolean')
             throw `emptyId`
@@ -104,10 +100,10 @@ function deleteTrack() {
             throw `notNumber`
         if(!tracks.some(item => item.id == trackId))
             throw `foundNoTrack`
-        let deletedExpenseAmount = tracks.find(item => item.id === trackId).amount
+        let deletedExpenseAmount = tracks.find(item => item.id == trackId).amount
         console.log(`Expense deleted successfully. ID : ${trackId}`)
-        budgetAfter_add_delete(+deletedExpenseAmount, trackId)
-        tracks = tracks.filter(item => item.id !== trackId)
+        budgetAfter_add_delete(deletedExpenseAmount, trackId)
+        tracks = tracks.filter(item => item.id != trackId)
         writeFile()
     }
     catch(error) {
@@ -121,17 +117,21 @@ function deleteTrack() {
 }
 function list() {
     let filterTrackByCategory
-    if(argv.category !== undefined && typeof(argv.category) !== 'boolean') {
+    let filterTrackByMonth
+    if(isArgvPropValid(argv.category)) {
         filterTrackByCategory = tracks.filter(item => item.category === argv.category)
         console.table(filterTrackByCategory)
     }
-    else if(argv.month) {
-        //TODO
+    else if(argv.month !== undefined && typeof(argv.month) !== 'boolean') {
+        isPositiveNumber(argv, 'month')
+        isMonthInRange(argv.month)
+        filterTrackByMonth = tracks.filter(item => splitMonth(item.date) === argv.month)
+        console.table(filterTrackByMonth)
     }
     else
         console.table(tracks)
 }
-function monthRaneCheck(num) {
+function isMonthInRange(num) {
     let monthRange = Array.from({length: 12}, (x, i) => i + 1)
     try {
         if(!monthRange.includes(num)){ 
@@ -149,15 +149,14 @@ function numberToMonth(num) {
 function summary(month) {
     let summary = 0
     if(month) {
-        let currentMonth = splitMonthByDate(formattedDate())
+        let currentMonth = splitMonth(currentDate())
         try {
             if(typeof(month) === 'boolean')
                 throw `empty`
             if(isNaN(month))
                 throw `notNum`
-            monthRaneCheck(month)
-
-            let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) === month)
+            isMonthInRange(month)
+            let filterTracksByMonth = tracks.filter(item => parseInt(item.date.slice(5,7)) == month)
             filterTracksByMonth.forEach(item => summary += item.amount)
             if(month != currentMonth)
                 console.log(`Total expenses for ${numberToMonth(`${month}`)}:`, summary)
@@ -179,27 +178,22 @@ function summary(month) {
     }
 }
 function budgetHandler() {
-    if(argv.remove !== undefined && typeof(argv.remove) !== 'boolean'){
-        (function deleteBudget() {
-            if(isValValid(argv, 'remove')) {
-                if(monthRaneCheck(argv.remove)) {
+    if(argv.remove !== undefined && typeof(argv.remove) !== 'boolean') {
+        function deleteBudget() {
+            if(isPositiveNumber(argv, 'remove')) {
+                if(isMonthInRange(argv.remove)) {
                     let haveMonthBudget = budget.some(item => Object.keys(item) == argv.remove)
                     if(haveMonthBudget) {
                         removeBudget(argv.remove)
-                        console.log(`${numberToMonth(`${argv.remove};s budget removed successfully.`)}`)
-                        return
+                        console.log(`${numberToMonth(`${argv.remove}`)} budget removed successfully.`)
                     }
                     else {
-                        console.error(`No budget had been set for ${numberToMonth(`${argv.remove}.`)}`)
-                        return
+                        console.error(`No budget has been set for ${numberToMonth(`${argv.remove}.`)}`)
                     }
                 }
-                else
-                    return
             }
-            else
-                return
-        })()
+        }
+        deleteBudget()
         return
     }
     else if(argv.remove === undefined && typeof(argv.remove) === 'boolean') {
@@ -208,50 +202,57 @@ function budgetHandler() {
     }
 
     if(argv.amount !== undefined && typeof(argv.amount) !== 'boolean') {
-        (function initializeBudget() {
-            let isAmountValValid = isValValid(argv, 'amount')
-            if(isAmountValValid) {
+        (function initializeBudget() { 
+            if(isPositiveNumber(argv, 'amount')) {
                 if(argv.month !== undefined && typeof(argv.month) !== 'boolean'){
-                    let isMonthValValid = isValValid(argv, 'month')
-                    let isMonthInRange =  monthRaneCheck(argv.month)
-                    if(isMonthValValid && isMonthInRange) {
+                    if(isPositiveNumber(argv, 'month') && isMonthInRange(argv.month)) {
                         let budgetKeys = budget.map(item => Object.keys(item)[0])
-                        let budgetAlreadyExist = budgetKeys.includes(argv.month.toString())
-                        
-                        
-                        if(budgetAlreadyExist) {
-                            budget
-                                .find(item => Object.keys(item) == argv.month)
-                                [argv.month.toString()] = argv.amount
-                            // TODO takes the amount in both side of condition from below function or make it work outside of condition.
-                            substractPreviousExpensesFromNewSetBudget(argv.month) // -> move it out
-            
-                            console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
+                        let budgetAlreadyExist
+                        if(budgetKeys.length > 0) {
+                            budgetAlreadyExist = budgetKeys.includes(`${argv.month}`)
                         }
-                        else {
-                            budget.push({ [argv.month] : argv.amount })
-                            substractPreviousExpensesFromNewSetBudget(argv.month)
-
-                            console.log(`${numberToMonth(`${argv.month}`)} budget set to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
-                        }
+                        (function finalBudgetAmount() {
+                                let currentMonth = splitMonth(currentDate())
+                                let currentMonthSum
+                                let finalBudget
+                                if(currentMonth == argv.month) {
+                                    currentMonthSum = summary(currentMonth)
+                                }
+                                if(currentMonthSum) {
+                                    finalBudget = argv.amount - currentMonthSum
+                                }
+                                else {
+                                    finalBudget = argv.amount
+                                }
+                                if(budgetAlreadyExist) {
+                                    budget.find(item => Object.keys(item) == argv.month)[argv.month] = finalBudget
+                                    console.log(`${numberToMonth(`${argv.month}`)} budget updated to $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
+                                }
+                                else {
+                                    budget.push({ [argv.month] : finalBudget })
+                                    console.log(`${numberToMonth(`${argv.month}`)} budget remaining: $${budget.find(item => Object.keys(item) == argv.month)[argv.month]}`)
+                                }
+                        })()
                         writeFile()
                     }
                 }
-                else
+                else {
                     console.error(`You didn't initialize the month.`)
+                }
             }
         })()
     }
-    else
+    else {
         console.error(`You didn't initialize the amount`)
-
+    }
     function removeBudget(month) {
         budget = budget.filter(item => Object.keys(item) != month)
         writeFile()
     }
+}
 
-    function isValValid(obj, prop) {
-        try {
+function isPositiveNumber(obj, prop) {
+    try {
             if(isNaN(obj[prop]))
                 throw `notNum`
             if(obj[prop] < 0)
@@ -260,60 +261,41 @@ function budgetHandler() {
         }
         catch(error) { 
             if(error === `notNum`)
-                console.error(`${prop} should be number`)
+                console.error(`${prop} should be a number.`)
             if(error === `negative`)
-                console.error(`${prop} should be positive number`)
+                console.error(`${prop} should be a positive number.`)
             return false
         }
-    }
 }
 
-function budgetAfter_add_delete(amount, /* month, */ expenseId) {
-    let month = splitMonthById(expenseId)
+function budgetAfter_add_delete(expenseAmount, expenseId) {
+    let month = find_splitMonth(expenseId)
 
-    let monthBudget = budget.find(item => Object.keys(item) == month) // || {[month]:finalSum}
-    if(month) {
-        budget = budget.filter(item => Object.keys(item) != month)
-
+    let thisMonthBudget = budget.find(item => Object.keys(item) == month)[month]
+    if(thisMonthBudget) {
+        let remainedMonthBudget = thisMonthBudget + expenseAmount
         try {
-            let remainedMonthBudget = monthBudget[month] + amount
             if(remainedMonthBudget < 0)
                 throw `budgetNegative`
         }
         catch {
-            console.warn(`Warning! Expenses has passed the budget. The remained budget for this month: ${monthBudget[month]}`)
+            console.warn(`Warning! Expenses has passed the budget. The remained budget for this month: ${remainedMonthBudget}`)
         }
-        monthBudget[month] += amount
-        budget.push(monthBudget)
-        console.log(`${numberToMonth(`${month}`)} budget remaining: `,monthBudget[month]) // worked properly
+        budget.find(item => Object.keys(item) == month)[month] = remainedMonthBudget
+        console.log(budget)
+        console.log(`${numberToMonth(`${month}`)} budget remaining: `,remainedMonthBudget)
         writeFile()
     }
 }
-function splitMonthById(expenseId) {
+function find_splitMonth(expenseId) {
     let splitMonth = tracks.find(item => item.id == expenseId)?.date
     splitMonth = parseInt(splitMonth?.slice(5,7))
     return splitMonth
 }
-function splitMonthByDate(date) {
+
+function splitMonth(date) {
     let splitedMonth = parseInt(date?.slice(5,7))
     return splitedMonth
 }
-function substractPreviousExpensesFromNewSetBudget(month) {
-    let currentMonth = splitMonthByDate(formattedDate())
-    let currentMonthSum = summary(currentMonth)
-
-    if(month == currentMonth) {
-        
-        budget.find(item => Object.keys(item) == currentMonth)[month] -= currentMonthSum
-        let remainedBudget_substractingMonthBudget = budget.find(item => Object.keys(item) == currentMonth)[month]
-        writeFile()
-        try {
-            if(remainedBudget_substractingMonthBudget < 0)
-                throw `budgetNegative`
-        }
-        catch {
-            console.warn(`Warning! Expense is more than budget. The remained budget for this month: $${remainedBudget_substractingMonthBudget}`)
-        }
-
-    }
-}
+// TODO 
+//      let user to set budget only for future
