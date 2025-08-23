@@ -62,7 +62,6 @@ let errorHandling = {
 }
 
 function writeFile() {
-    // create/store-in final data in json file
     if(budgets)
         (function sortBudgetsByMonth() {
             let finalBudgets = {}
@@ -79,6 +78,15 @@ function currentDate() {
     const day = today.getDate();
     const formattedDate = `${year}-${month < 10 ? '0' : ''}${month}-${day < 10 ? '0' : ''}${day}`;
     return formattedDate
+}
+function splitMonth(date) {
+    let splitedMonth = parseInt(date?.slice(5,7))
+    return splitedMonth
+}
+function find_splitMonth(expenseId) {
+    let date = tracks.find(item => item.id == expenseId)?.date
+    let splitedMonth = splitMonth(date)
+    return splitedMonth
 }
 function numberToMonth(num) {
     return Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(num))
@@ -181,7 +189,7 @@ function list() {
 
     else console.table(tracks)
 }
-// fix sum. literal use and in finalbudget calcluation use.
+
 function summary(month) {
     let summary = 0
     if(month) {
@@ -195,7 +203,7 @@ function summary(month) {
                     else return
                 }
             }
-            console.log(`Total expenses for ${numberToMonth(`${argv.month}`)}:`, summary)
+            console.log(`Total expenses for ${numberToMonth(`${argv.month}`)}: $${summary}`)
         }
         return summary
     }
@@ -242,39 +250,39 @@ function budgetHandler() {
             console.error(`No budget has been set for `, numberToMonth(`${argv.remove}`))
         }
     }
-    function finalBudgetAmount() { //TODO
+    function finalBudgetAmount() { 
         let currentMonth = splitMonth(currentDate())
-
-        if(currentMonth < argv.month)
-            console.error(numberToMonth(argv.month.toString()), ``)
+        let finalBudget
+        if(currentMonth < argv.month) {
+            console.error(`Can't set budget for previous months`)
+            return
+        }
+        else if ((currentMonth === argv.month)) {
+            let currentMonthSummary = summary(currentMonth)
+            finalBudget = argv.amount - currentMonthSummary
+        }
+        else {
+            finalBudget = argv.amount
+        }
+        budgets[argv.month] = finalBudget
+        console.log(numberToMonth(argv.month.toString()), `budget remaining: $${finalBudget}`)       
+        writeFile()
     }
 }
 function budgetAfter_add_delete(expenseAmount, expenseId) {
     let month = find_splitMonth(expenseId)
-
-    let thisMonthBudget = budgets[month]
-    if(thisMonthBudget) {
-        let remainedMonthBudget = thisMonthBudget + expenseAmount
+    let monthBudget = budgets[month]
+    if(monthBudget) {
+        let remainedMonthBudget = monthBudget + expenseAmount
         try {
             if(remainedMonthBudget < 0)
                 throw `budgetNegative`
         }
         catch {
-            console.warn(`Warning! Expenses has passed the budget. The remained budget for this month: ${remainedMonthBudget}`)
+            console.warn(`Warning! Expenses has passed the budget.`)
         }
         budgets[month] = remainedMonthBudget
-        console.log(`${numberToMonth(`${month}`)} budget remaining: `,remainedMonthBudget)
+        console.log(`${numberToMonth(`${month}`)} budget remaining: ${remainedMonthBudget < 0 ? `$-${-remainedMonthBudget}` : `$${remainedMonthBudget}`}`)
     }
     writeFile()
 }
-function find_splitMonth(expenseId) {
-    let splitMonth = tracks.find(item => item.id == expenseId)?.date
-    splitMonth = parseInt(splitMonth?.slice(5,7))
-    return splitMonth
-}
-function splitMonth(date) {
-    let splitedMonth = parseInt(date?.slice(5,7))
-    return splitedMonth
-}
-// TODO 
-//      let user to set budget only for future
