@@ -8,7 +8,7 @@
         "name": "Launch My CLI Program",
         "program": "${workspaceFolder}/index.js",
         "request": "launch",
-        "args": ["add", "--description", "--amount"],
+        "args": [""],
         "type": "node"
     }
     ]
